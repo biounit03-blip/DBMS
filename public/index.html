@@ -1,0 +1,91 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Green Meadows Society Manager</title>
+<style>
+:root{--bg:#f6f5f1;--cd:#fff;--tx:#1c2430;--mu:#667085;--bd:#e3e1da;--ac:#1f6f5c;--ab:#e3f2ed;--wa:#8a4f05;--wb:#fcefd6;--er:#a32d2d;--eb:#fbe4e4}
+@media(prefers-color-scheme:dark){:root{--bg:#12181f;--cd:#1a232d;--tx:#e8e6df;--mu:#9aa4b2;--bd:#2c3846;--ac:#5dcaa5;--ab:#12352b;--wa:#f0b765;--wb:#3a2c10;--er:#f09595;--eb:#3d1b1b}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{padding:24px 20px 8px;max-width:1100px;margin:auto;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}h1{font-size:24px;margin:0;font-weight:600}header p{margin:2px 0 0;color:var(--mu)}
+nav{display:flex;gap:6px;flex-wrap:wrap;max-width:1100px;margin:auto;padding:12px 20px}
+nav button{border:1px solid var(--bd);background:var(--cd);color:var(--tx);padding:8px 14px;border-radius:8px;cursor:pointer;font:inherit}nav button.on{background:var(--ac);color:var(--bg);border-color:var(--ac)}
+main{max-width:1100px;margin:auto;padding:4px 20px 48px}
+.g{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:16px}
+.c{background:var(--cd);border:1px solid var(--bd);border-radius:12px;padding:16px;margin-bottom:16px}.s b{display:block;font-size:26px;font-weight:600}.s span,.mu{color:var(--mu);font-size:13px}
+h2{font-size:17px;margin:0 0 12px;font-weight:600}
+form{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));align-items:end}label{display:grid;gap:3px;font-size:13px;color:var(--mu)}
+input,select{font:inherit;padding:8px 10px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx);width:100%}
+.btn{font:inherit;padding:8px 14px;border-radius:8px;border:0;background:var(--ac);color:var(--bg);cursor:pointer}.sm{padding:4px 10px;font-size:13px;border-radius:6px}.ghost{background:transparent;border:1px solid var(--bd);color:var(--tx)}
+.ow{overflow-x:auto}table{border-collapse:collapse;width:100%;min-width:560px}th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--bd);white-space:nowrap}th{font-size:12px;color:var(--mu);font-weight:500}
+.b{padding:2px 9px;border-radius:99px;font-size:12px;background:var(--ab);color:var(--ac)}.b.w{background:var(--wb);color:var(--wa)}.b.e{background:var(--eb);color:var(--er)}
+.bar{display:flex;gap:10px;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap}.bar h2{margin:0}.bar input,.bar select{width:auto}.empty{color:var(--mu);padding:12px 0}
+</style></head><body>
+<header><div><h1>Green Meadows society manager</h1><p>Flats, staff, service requests, maintenance bills and the security gate</p></div><div id="who" class="mu"></div></header>
+<nav id="nav"></nav><main id="v"></main>
+<script>
+const R={Secretary:['Dashboard','Flats','Staff','Requests','Bills','Visitors'],Treasurer:['Dashboard','Flats','Bills'],Security:['Visitors','Flats'],Resident:['Home','Requests','Bills','Visitors']};
+let tok=sessionStorage.getItem('tok'),user=JSON.parse(sessionStorage.getItem('user')||'null'),tab='',fs='',AP=[];
+const $=s=>document.querySelector(s),E=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const inr=n=>'\u20b9'+Number(n||0).toLocaleString('en-IN'),dt=s=>s?new Date(s.replace(' ','T')).toLocaleString('en-IN',{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'}):'\u2014';
+const bdg=(t,c='')=>`<span class="b ${c}">${E(t)}</span>`,st=(n,l)=>`<div class="c s" style="margin:0"><b>${n}</b><span>${l}</span></div>`;
+const tbl=(h,r)=>r.length?`<div class="ow"><table><tr>${h.map(x=>`<th>${x}</th>`).join('')}</tr>${r.map(x=>`<tr>${x.map(y=>`<td>${y}</td>`).join('')}</tr>`).join('')}</table></div>`:'<div class="empty">Nothing here yet.</div>';
+const inp=(n,l,t='text',v='')=>`<label>${l}<input name="${n}" type="${t}" value="${v}" required></label>`,sel=(n,l,o)=>`<label>${l}<select name="${n}">${o}</select></label>`;
+const opt=(a,v,t)=>a.map(x=>`<option value="${x[v]}">${E(typeof t=='function'?t(x):x[t])}</option>`).join('');
+const mn=m=>m+' month'+(m>1?'s':''),ST=s=>s=='Open'?'e':s=='Resolved'?'':'w';
+
+async function api(m,u,b){
+  const r=await fetch('/api'+u,{method:m,headers:{'Content-Type':'application/json',...(tok?{Authorization:'Bearer '+tok}:{})},body:b?JSON.stringify(b):undefined});
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok){if(r.status==401&&tok)logout();throw new Error(j.error||'Request failed')}return j}
+async function act(m,u,b){try{await api(m,u,b)}catch(x){alert(x.message)}render()}
+const A={addFlat:o=>api('POST','/apartments',o),addStaff:o=>api('POST','/staff',o),addReq:o=>api('POST','/requests',o),addVisit:o=>api('POST','/visits',o),
+  gen:o=>api('POST','/bills/generate',o).then(r=>alert(r.created?r.created+' bills generated. Earlier unpaid months add a late fee.':'Bills for that month already exist'))};
+async function sub(e,n){e.preventDefault();try{await A[n](Object.fromEntries(new FormData(e.target)))}catch(x){alert(x.message)}render();return false}
+
+const flats=a=>tbl(['Flat','Owner','Phone','Lives here','Area','Months unpaid','Dues',''],a.map(f=>[E(f.building+' '+f.unit_number),E(f.owner),E(f.phone),E(f.lives),f.area_sqft,
+  f.months_unpaid==null?'\u2014':f.months_unpaid?bdg(mn(f.months_unpaid),f.months_unpaid>1?'e':'w'):'\u2014',f.total_due?bdg(inr(f.total_due),'e'):'\u2014',
+  user.role=='Secretary'?`<button class="btn sm ghost" onclick="confirm('Remove this flat and all its records?')&&act('DELETE','/apartments/${f.apartment_id}')">Remove</button>`:'']));
+const flt=v=>{v=v.toLowerCase();$('#ft').innerHTML=flats(AP.filter(f=>(f.building+f.unit_number+f.owner+f.lives).toLowerCase().includes(v)))};
+
+const V={
+async Dashboard(){const[d,ap]=await Promise.all([api('GET','/dashboard'),api('GET','/apartments')]);
+ return `<div class="g">${st(d.flats,'Flats')}${st(d.staff,'Staff')}${st(d.open_requests,'Open requests')}${st(d.visitors_inside,'Visitors inside')}${st(inr(d.dues_pending),'Dues pending')}${st(inr(d.collected),'Collected')}</div>
+ <div class="c"><h2>Billed vs collected</h2>${tbl(['Month','Billed','Collected','Pending'],d.monthly.map(m=>[m.billing_month,inr(m.billed),inr(m.collected),inr(m.billed-m.collected)]))}</div>
+ <div class="c"><h2>Flats with the most unpaid months</h2>${tbl(['Flat','Owner','Months unpaid','Amount due'],ap.filter(f=>f.months_unpaid>0).sort((a,b)=>b.months_unpaid-a.months_unpaid||b.total_due-a.total_due).slice(0,10).map(f=>[E(f.building+' '+f.unit_number),E(f.owner),bdg(mn(f.months_unpaid),f.months_unpaid>1?'e':'w'),inr(f.total_due)]))}</div>`},
+async Flats(){AP=await api('GET','/apartments');const bl=user.role=='Secretary'?await api('GET','/buildings'):[];
+ return `${user.role=='Secretary'?`<div class="c"><h2>Add a flat owner</h2><form onsubmit="return sub(event,'addFlat')">${sel('building_id','Building',opt(bl,'building_id','name'))}${inp('unit_number','Flat number')}${inp('area_sqft','Area (sq ft)','number')}${inp('owner_name','Owner name')}${inp('phone','Phone')}<label>Tenant name (if rented)<input name="tenant_name"></label><button class="btn">Add flat</button></form></div>`:''}
+ <div class="c"><div class="bar"><h2>All flats (${AP.length})</h2><input placeholder="Search owner or flat" oninput="flt(this.value)"></div><div id="ft">${flats(AP)}</div></div>`},
+async Staff(){const s=await api('GET','/staff');
+ return `<div class="c"><h2>Add maintenance or security staff</h2><form onsubmit="return sub(event,'addStaff')">${inp('name','Name')}${sel('role','Role','<option>Plumber</option><option>Electrician</option><option>Housekeeping</option><option>Carpenter</option><option>Security guard</option>')}${inp('phone','Phone')}<button class="btn">Add staff</button></form></div>
+ <div class="c"><h2>Staff directory</h2>${tbl(['Name','Role','Phone','Open tasks',''],s.map(x=>[E(x.name),bdg(x.role),E(x.phone),x.open_tasks,`<button class="btn sm ghost" onclick="act('DELETE','/staff/${x.staff_id}')">Remove</button>`]))}</div>`},
+async Requests(){const sec=user.role=='Secretary',[rq,ap,sf]=await Promise.all([api('GET','/requests'),sec?api('GET','/apartments'):[],sec?api('GET','/staff'):[]]);
+ const cat='<option>Plumbing</option><option>Electrical</option><option>Housekeeping</option><option>Carpentry</option><option>Other</option>',tech=sf.filter(x=>x.role!='Security guard');
+ return `<div class="c"><h2>Raise a service request</h2><form onsubmit="return sub(event,'addReq')">${sec?sel('apartment_id','Flat',opt(ap,'apartment_id',f=>f.building+' '+f.unit_number+' ('+f.owner+')')):''}${sel('category','Category',cat)}${inp('description','Describe the issue')}${sec?sel('staff_id','Assign to','<option value="">Assign later</option>'+opt(tech,'staff_id',x=>x.name+' ('+x.role+')')):''}<button class="btn">Submit request</button></form></div>
+ <div class="c"><h2>Requests</h2>${tbl(['Raised','Flat','Category','Issue','Assigned to','Status',''],rq.map(r=>[dt(r.raised_at),E(r.building+' '+r.unit_number),E(r.category),E(r.description),
+  sec&&r.status!='Resolved'?`<select onchange="act('PATCH','/requests/${r.request_id}',{staff_id:this.value})"><option value="">Unassigned</option>${tech.map(x=>`<option value="${x.staff_id}" ${x.staff_id==r.staff_id?'selected':''}>${E(x.name)}</option>`).join('')}</select>`:E(r.assigned_to||'Unassigned'),
+  bdg(r.status,ST(r.status)),sec&&r.status!='Resolved'?`<button class="btn sm" onclick="act('PATCH','/requests/${r.request_id}',{status:'Resolved'})">Mark resolved</button>`:'']))}</div>`},
+async Bills(){const T=user.role=='Treasurer',Rs=user.role=='Resident',b=await api('GET','/bills'+(fs?'?status='+fs:'')),all=Rs?b:[],un=all.filter(x=>x.status=='Unpaid');
+ const ym=new Date().toISOString().slice(0,7);
+ return `${Rs?`<div class="g">${st(un.length,'Months unpaid')}${st(inr(un.reduce((a,x)=>a+x.total_amount,0)),'Total outstanding')}</div>${un.length?`<div class="c"><button class="btn" onclick="act('POST','/apartments/${user.apartment_id}/pay-all')">Pay all dues</button></div>`:''}`:''}
+ ${T?`<div class="c"><h2>Generate monthly maintenance bills</h2><form onsubmit="return sub(event,'gen')">${inp('month','Month','month',ym)}${inp('rate','Rate per sq ft (\u20b9)','number','3')}${inp('late_fee','Late fee per unpaid month (\u20b9)','number','100')}<button class="btn">Generate for all flats</button></form><p class="mu">Each bill is flat area multiplied by the rate, plus a late fee for every earlier month the flat has not paid.</p></div>`:''}
+ <div class="c"><div class="bar"><h2>Bills</h2><select onchange="fs=this.value;render()">${['','Unpaid','Paid'].map(s=>`<option value="${s}" ${s==fs?'selected':''}>${s||'All'}</option>`).join('')}</select></div>${tbl(['Month','Flat','Owner','Amount','Status','Due date',''],b.map(x=>[x.billing_month,E(x.building+' '+x.unit_number),E(x.owner),inr(x.total_amount)+(x.late_fee?` <span class="mu">incl. ${inr(x.late_fee)} late fee</span>`:''),bdg(x.status,x.status=='Paid'?'':'e'),x.due_date,
+  x.status=='Unpaid'&&(T||Rs)?`<button class="btn sm" onclick="act('POST','/bills/${x.bill_id}/pay')">${T?'Mark paid':'Pay now'}</button>`:'']))}</div>`},
+async Visitors(){const G=user.role=='Security',[v,ap,sf]=await Promise.all([api('GET','/visits'),G?api('GET','/apartments'):[],G?api('GET','/staff'):[]]);
+ return `${G?`<div class="c"><h2>Record a visitor at the gate</h2><form onsubmit="return sub(event,'addVisit')">${inp('name','Visitor name')}${inp('phone','Phone')}${sel('apartment_id','Visiting flat',opt(ap,'apartment_id',f=>f.building+' '+f.unit_number+' ('+f.owner+')'))}${sel('purpose','Purpose','<option>Guest</option><option>Delivery</option><option>Service</option><option>Family</option><option>Cab</option>')}${sel('staff_id','Guard on duty',opt(sf.filter(x=>x.role=='Security guard'),'staff_id','name'))}<button class="btn">Check in</button></form></div>`:''}
+ <div class="c"><h2>Gate log</h2>${tbl(['Visitor','Phone','Flat','Purpose','Guard','In','Out',''],v.map(x=>[E(x.visitor),E(x.phone),E(x.building+' '+x.unit_number),E(x.purpose),E(x.guard),dt(x.check_in),x.check_out?dt(x.check_out):bdg('Inside','w'),G&&!x.check_out?`<button class="btn sm" onclick="act('PATCH','/visits/${x.visit_id}/checkout')">Check out</button>`:'']))}</div>`},
+async Home(){const[b,r,v]=await Promise.all([api('GET','/bills'),api('GET','/requests'),api('GET','/visits')]),un=b.filter(x=>x.status=='Unpaid');
+ return `<div class="g">${st(E(user.label),'Your flat')}${st(un.length,'Months unpaid')}${st(inr(un.reduce((a,x)=>a+x.total_amount,0)),'Total outstanding')}${st(r.filter(x=>x.status!='Resolved').length,'Open requests')}${st(v.filter(x=>!x.check_out).length,'Visitors inside')}</div>`}};
+
+async function render(){
+  if(!user)return login();
+  if(!R[user.role].includes(tab))tab=R[user.role][0];
+  $('#nav').innerHTML=R[user.role].map(t=>`<button class="${t==tab?'on':''}" onclick="tab='${t}';fs='';render()">${t}</button>`).join('');
+  $('#who').innerHTML=`${E(user.role)}${user.label?' \u00b7 '+E(user.label):''} <button class="btn sm ghost" onclick="logout()">Log out</button>`;
+  const y=scrollY;try{$('#v').innerHTML=await V[tab]()}catch(e){$('#v').innerHTML='<div class="c">'+E(e.message)+'</div>'}scrollTo(0,y)}
+async function login(){
+  $('#nav').innerHTML='';$('#who').innerHTML='';
+  const ap=await api('GET','/public/apartments').catch(()=>[]);
+  $('#v').innerHTML=`<div class="c" style="max-width:420px;margin:24px auto"><h2>Sign in</h2><form onsubmit="return signin(event)" style="grid-template-columns:1fr">${sel('role','Role',Object.keys(R).map(r=>`<option>${r}</option>`).join(''))}<label id="flb" style="display:none">Your flat<select name="apartment_id">${opt(ap,'apartment_id',f=>f.building+' '+f.unit_number)}</select></label>${inp('pin','PIN','password')}<button class="btn">Sign in</button></form><p class="mu">Demo PINs: Secretary 1111, Treasurer 2222, Security 3333, Resident 4444</p></div>`;
+  $('[name=role]').onchange=e=>$('#flb').style.display=e.target.value=='Resident'?'grid':'none'}
+async function signin(e){e.preventDefault();try{const r=await api('POST','/login',Object.fromEntries(new FormData(e.target)));
+  tok=r.token;user=r.user;tab='';sessionStorage.setItem('tok',tok);sessionStorage.setItem('user',JSON.stringify(user));render()}catch(x){alert(x.message)}return false}
+function logout(){tok=null;user=null;sessionStorage.clear();render()}
+render();
+</script></body></html>
