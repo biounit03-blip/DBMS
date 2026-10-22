@@ -1,0 +1,23 @@
+# Render Blueprint: creates the web service and a PostgreSQL database together
+databases:
+  - name: society-db
+    plan: free
+    databaseName: society
+    user: society
+
+services:
+  - type: web
+    name: society-app
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: society-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: NODE_VERSION
+        value: 20
